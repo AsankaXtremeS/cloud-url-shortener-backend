@@ -1,0 +1,75 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # 1. Get the latest source code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 3. Build Docker image
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t asanka2002/cloud-url-shortener-backend:latest \
+            -t asanka2002/cloud-url-shortener-backend:${{ github.sha }} \
+            .
+
+      # 4. Push Docker image to Docker Hub
+      - name: Push Docker image
+        run: |
+          docker push asanka2002/cloud-url-shortener-backend:latest
+          docker push asanka2002/cloud-url-shortener-backend:${{ github.sha }}
+
+      # 5. Deploy to EC2
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+
+        run: |
+
+          mkdir -p ~/.ssh
+
+          echo "$EC2_SSH_KEY" > ~/.ssh/ec2_key
+
+          chmod 600 ~/.ssh/ec2_key
+
+          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+
+          ssh -i ~/.ssh/ec2_key \
+            "$EC2_USERNAME@$EC2_HOST" << 'EOF'
+
+            sudo docker pull asanka2002/cloud-url-shortener-backend:latest
+
+            sudo docker stop cloud-url-shortener-backend || true
+
+            sudo docker rm cloud-url-shortener-backend || true
+
+            sudo docker run -d \
+              --name cloud-url-shortener-backend \
+              --env-file /home/ubuntu/.env \
+              -p 5000:5000 \
+              --restart unless-stopped \
+              asanka2002/cloud-url-shortener-backend:latest
+
+            sudo docker image prune -f
+
+          EOF
