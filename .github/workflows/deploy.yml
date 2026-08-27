@@ -43,33 +43,48 @@ jobs:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USERNAME: ${{ secrets.EC2_USERNAME }}
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
         run: |
-
           mkdir -p ~/.ssh
-
-          echo "$EC2_SSH_KEY" > ~/.ssh/ec2_key
-
+          # Ensure clean UNIX line endings for the private key
+          printf "%s\n" "$EC2_SSH_KEY" | tr -d '\r' > ~/.ssh/ec2_key
           chmod 600 ~/.ssh/ec2_key
 
-          ssh-keyscan -H "$EC2_HOST" >> ~/.ssh/known_hosts
+          # Connect to EC2 and deploy container
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=30 -i ~/.ssh/ec2_key \
+            "$EC2_USERNAME@$EC2_HOST" << EOF
+            set -e
 
-          ssh -i ~/.ssh/ec2_key \
-            "$EC2_USERNAME@$EC2_HOST" << 'EOF'
+            echo "Logging into Docker Hub on EC2..."
+            echo "$DOCKERHUB_TOKEN" | sudo docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
+            echo "Pulling latest image..."
             sudo docker pull asanka2002/cloud-url-shortener-backend:latest
 
+            echo "Stopping old container if exists..."
             sudo docker stop cloud-url-shortener-backend || true
-
             sudo docker rm cloud-url-shortener-backend || true
 
-            sudo docker run -d \
-              --name cloud-url-shortener-backend \
-              --env-file /home/ubuntu/.env \
-              -p 5000:5000 \
-              --restart unless-stopped \
-              asanka2002/cloud-url-shortener-backend:latest
+            echo "Starting new container..."
+            # Check if ~/.env exists, otherwise run without env-file or with defaults
+            if [ -f "\$HOME/.env" ]; then
+              sudo docker run -d \
+                --name cloud-url-shortener-backend \
+                --env-file "\$HOME/.env" \
+                -p 5000:5000 \
+                --restart unless-stopped \
+                asanka2002/cloud-url-shortener-backend:latest
+            else
+              sudo docker run -d \
+                --name cloud-url-shortener-backend \
+                -p 5000:5000 \
+                --restart unless-stopped \
+                asanka2002/cloud-url-shortener-backend:latest
+            fi
 
+            echo "Pruning unused images..."
             sudo docker image prune -f
 
+            echo "Deployment successful!"
           EOF
