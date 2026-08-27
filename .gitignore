@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Build output
+dist/
+build/
+.next/
+out/
+
+# Cache
+.cache/
+.npm/
+.eslintcache
+.parcel-cache/
+
+# TypeScript
+*.tsbuildinfo
+
+# Testing
+test-results/
+
+# Temporary files
+tmp/
+temp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editors
+.vscode/
+.idea/
+
+# Local configuration
+*.local
+
+# Vercel
+.vercel/
+
+# Misc
+*.swp
+*.swo
